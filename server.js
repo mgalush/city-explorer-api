@@ -29,7 +29,7 @@ app.get('/weather', (req, res) => {
   const forecast = weatherData.data[0].weather.description;
   const time = weatherData.data[0].valid_date;
   const location = new Weather(forecast, time);
-  res.send(location);
+  res.send([location]);
 });
 
 function Location(displayName, city, longitude, latitude) {
