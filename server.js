@@ -32,6 +32,10 @@ app.get('/weather', (req, res) => {
   res.send([location]);
 });
 
+app.get('*', (req, res) => {
+  res.status(500).send('This page does not exist');
+})
+
 function Location(displayName, city, longitude, latitude) {
   this.search_query = city;
   this.formatted_query = displayName;
