@@ -29,11 +29,15 @@ function getLocation(req, res) {
 
 function getWeather(req, res) {
   const weatherData = require('./data/weather.json');
-  const forecast = weatherData.data[0].weather.description;
-  const date = new Date(weatherData.data[0].valid_date);
-  const time = date.toDateString();
-  const location = new Weather(forecast, time);
-  res.send([location]);
+  const weatherDataArray = weatherData.data.map((value) => {
+    const forecast = value.weather.description;
+    const date = new Date(value.valid_date);
+    const time = date.toDateString();
+    const location = new Weather(forecast, time);
+    return location;
+  })
+
+  res.send(weatherDataArray);
 }
 
 function sendError(req, res) {
