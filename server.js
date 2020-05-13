@@ -20,11 +20,30 @@ app.get('*', sendError);
 function getLocation(req, res) {
   const locationData = require('./data/location.json');
   const displayName = locationData[0].display_name;
+
   const city = req.query.city;
-  const longitude = locationData[0].lon;
-  const latitude = locationData[0].lat;
-  let location = new Location(displayName, city, longitude, latitude);
-  res.send(location);
+  if (!city) {
+    res.status(404).send('You need to pass in a city query parameter');
+  }
+  const queryForSuper = {
+    lat: req.query.latitude,
+    lon: req.query.longitude
+  };
+  const url = `https://us1.locationiq.com/v1/search.php?key=${process.env.GEOCODE_API_KEY}&city=${city}&format=json`;
+  console.log(url);
+  superagent.get(url)
+    // .query(queryForSuper)
+    .then(resultFromSuper => {
+      const longitude = resultFromSuper.body[0].lon;
+      const latitude = resultFromSuper.body[0].lat;
+      const displayName = resultFromSuper.body[0].display_name;
+      let location = new Location(displayName, city, longitude, latitude);
+      res.send(location);
+    })
+    .catch(error => {
+      console.log(error);
+      res.send(error).status(500);
+    });
 }
 
 function getWeather(req, res) {
