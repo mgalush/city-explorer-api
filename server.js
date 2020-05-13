@@ -29,10 +29,14 @@ function getLocation(req, res) {
     lat: req.query.latitude,
     lon: req.query.longitude
   };
-  const url = `https://us1.locationiq.com/v1/search.php?key=${process.env.GEOCODE_API_KEY}&city=${city}&format=json`;
-  console.log(url);
+  const url = 'https://us1.locationiq.com/v1/search.php';
+  const queryParameters = {
+    q: city,
+    key: process.env.GEOCODE_API_KEY,
+    format: 'json'
+  };
   superagent.get(url)
-    // .query(queryForSuper)
+    .query(queryParameters)
     .then(resultFromSuper => {
       const longitude = resultFromSuper.body[0].lon;
       const latitude = resultFromSuper.body[0].lat;
