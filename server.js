@@ -3,6 +3,7 @@
 // API dependencies
 require('dotenv').config();
 const express = require('express');
+const superagent = require('superagent');
 const cors = require('cors');
 
 // global variables
@@ -12,8 +13,11 @@ const app = express();
 //configs
 app.use(cors()); 
 
-app.get('/location', (req, res) => {
-  console.log('location server is running');
+app.get('/location', getLocation);
+app.get('/weather', getWeather);
+app.get('*', sendError);
+
+function getLocation(req, res) {
   const locationData = require('./data/location.json');
   const displayName = locationData[0].display_name;
   const city = req.query.city;
@@ -21,20 +25,20 @@ app.get('/location', (req, res) => {
   const latitude = locationData[0].lat;
   let location = new Location(displayName, city, longitude, latitude);
   res.send(location);
-});
+}
 
-app.get('/weather', (req, res) => {
-  console.log('weather server is running');
+function getWeather(req, res) {
   const weatherData = require('./data/weather.json');
   const forecast = weatherData.data[0].weather.description;
-  const time = weatherData.data[0].valid_date;
+  const date = new Date(weatherData.data[0].valid_date);
+  const time = date.toDateString();
   const location = new Weather(forecast, time);
   res.send([location]);
-});
+}
 
-app.get('*', (req, res) => {
+function sendError(req, res) {
   res.status(500).send('This page does not exist');
-})
+}
 
 function Location(displayName, city, longitude, latitude) {
   this.search_query = city;
