@@ -25,10 +25,7 @@ function getLocation(req, res) {
   if (!city) {
     res.status(404).send('You need to pass in a city query parameter');
   }
-  const queryForSuper = {
-    lat: req.query.latitude,
-    lon: req.query.longitude
-  };
+
   const url = 'https://us1.locationiq.com/v1/search.php';
   const queryParameters = {
     q: city,
@@ -52,15 +49,38 @@ function getLocation(req, res) {
 
 function getWeather(req, res) {
   const weatherData = require('./data/weather.json');
-  const weatherDataArray = weatherData.data.map((value) => {
-    const forecast = value.weather.description;
-    const date = new Date(value.valid_date);
-    const time = date.toDateString();
-    const location = new Weather(forecast, time);
-    return location;
-  })
 
-  res.send(weatherDataArray);
+  const queryForSuper = {
+    lat: req.query.latitude,
+    lon: req.query.longitude
+  };
+
+  const url = 'https://api.weatherbit.io/v2.0/current';
+
+  const queryParameters = {
+    key: process.env.WEATHER_API_KEY,
+    lat: req.query.latitude,
+    lon: req.query.longitude
+  };
+
+  superagent.get(url)
+    .query(queryParameters)
+    .then(resultFromSuper => {
+      const dataFromJSON = JSON.parse(resultFromSuper.text);
+      const weatherDataArray = dataFromJSON.data.map((value) => {
+        const forecast = value.weather.description;
+        const date = new Date(value.last_ob_time);
+        const time = date.toDateString();
+        const location = new Weather(forecast, time);
+        return location;
+      })
+      res.send(weatherDataArray);
+    })
+    .catch(error => {
+      console.log(error);
+      res.send(error).status(500);
+    });
+
 }
 
 function sendError(req, res) {
