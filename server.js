@@ -17,6 +17,9 @@ const client = new pg.Client(process.env.DATABASE_URL);
 client.on('error', console.error);
 client.connect();
 
+app.get('/', (req, res) => {
+  res.redirect('https://codefellows.github.io/code-301-guide/curriculum/city-explorer-app/front-end/');
+});
 app.get('/location', getLocation);
 app.get('/weather', getWeather);
 app.get('/trails', getTrails);
@@ -49,12 +52,10 @@ function getLocation(req, res) {
           .then(resultFromSuper => {
             // send data
             let newLocation = new Location(city, resultFromSuper.body[0]);
-            
             // store data in db
             const sqlQuery = 'INSERT INTO locations (search_query, formatted_query, longitude, latitude) VALUES ($1, $2, $3, $4);'
             const valueArray = [newLocation.search_query, newLocation.formatted_query, newLocation.longitude, newLocation.latitude];
             client.query(sqlQuery, valueArray);
-
             res.send(newLocation);
           })
           .catch(error => {
@@ -62,7 +63,6 @@ function getLocation(req, res) {
           });
         }
       })
-      
     }
 
     
@@ -72,7 +72,7 @@ function getWeather(req, res) {
     lon: req.query.longitude
   };
 
-  const url = 'https://api.weatherbit.io/v2.0/current';
+  const url = 'https://api.weatherbit.io/v2.0/forecast/daily';
 
   const queryParameters = {
     key: process.env.WEATHER_API_KEY,
@@ -87,7 +87,7 @@ function getWeather(req, res) {
       const dataFromJSON = resultFromSuper.body;
       const weatherDataArray = dataFromJSON.data.map((value) => {
         const forecast = value.weather.description;
-        const date = new Date(value.last_ob_time);
+        const date = new Date(value.ts * 1000);
         const time = date.toDateString();
         const location = new Weather(forecast, time);
         return location;
@@ -97,7 +97,6 @@ function getWeather(req, res) {
     .catch(error => {
       res.send(error).status(500);
     });
-
 }
 
 function getTrails(req, res) {
@@ -114,19 +113,7 @@ function getTrails(req, res) {
   .then(resultFromSuper => {
     const dataFromJSON = resultFromSuper.body;
     const trailsDataArray = dataFromJSON.trails.map((value) => {
-      const name = value.name;
-      const location = value.location;
-      const length = value.length;
-      const stars = value.stars;
-      const star_votes = value.star_votes;
-      const summary = value.summary
-      const trail_url = value.url;
-      const conditions = value.conditionDetails;
-      const date = new Date(value.conditionDate);
-      // TODO: figure out how to format date
-      const condition_date = date;
-      const condition_time = date;
-      const trail = new Trail (name, location, length, stars, star_votes, summary, trail_url, conditions, condition_date, condition_time)
+      const trail = new Trail(value);
       return trail;
     })
     res.send(trailsDataArray);
@@ -152,19 +139,18 @@ function Weather(forecast, time) {
   this.time = time;
 }
 
-function Trail(name, location, length, stars, star_votes, summary, trail_url, conditions, condition_date, condition_time) {
-  this.name = name;
-  this.location = location;
-  this.length = length;
-  this.stars = stars;
-  this.star_votes = star_votes;
-  this.summary = summary;
-  this.trail_url = trail_url;
-  this.conditions = conditions;
-  this.condition_date = condition_date;
-  this.condition_time = condition_time;
+function Trail(obj) {
+  this.name = obj.name;
+  this.location = obj.location;
+  this.length = obj.length;
+  this.stars = obj.stars;
+  this.star_votes = obj.star_votes;
+  this.summary = obj.summary;
+  this.trail_url = obj.trail_url;
+  this.conditions = obj.conditions;
+  this.condition_date = obj.conditionDate.split(' ')[0];
+  this.condition_time = obj.conditionDate.split(' ')[1];
 }
-
 
 app.listen(PORT, () => {
   console.log(PORT)
