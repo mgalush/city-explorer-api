@@ -12,17 +12,20 @@ const PORT = process.env.PORT || 3000;
 const app = express();
 
 //configs
-app.use(cors()); 
+app.use(cors());
 const client = new pg.Client(process.env.DATABASE_URL);
 client.on('error', console.error);
 client.connect();
 
 app.get('/', (req, res) => {
-  res.redirect('https://codefellows.github.io/code-301-guide/curriculum/city-explorer-app/front-end/');
+  res.redirect(
+    'https://codefellows.github.io/code-301-guide/curriculum/city-explorer-app/front-end/'
+  );
 });
 app.get('/location', getLocation);
 app.get('/weather', getWeather);
 app.get('/trails', getTrails);
+app.get('/movies', getMovies);
 app.get('*', sendError);
 
 function getLocation(req, res) {
@@ -35,41 +38,46 @@ function getLocation(req, res) {
   const queryParameters = {
     q: city,
     key: process.env.GEOCODE_API_KEY,
-    format: 'json'
+    format: 'json',
   };
 
-  // if location is in db, get data from db 
+  // if location is in db, get data from db
   // else, send data
   const sqlQuery = 'SELECT * FROM locations WHERE search_query=$1';
   const sqlValues = [city];
-  client.query(sqlQuery, sqlValues)
-    .then(resultFromSql => {
-      if(resultFromSql.rowCount !== 0) {
-        res.send(resultFromSql.rows[0])
-      } else {
-        superagent.get(url)
-          .query(queryParameters)
-          .then(resultFromSuper => {
-            // send data
-            let newLocation = new Location(city, resultFromSuper.body[0]);
-            // store data in db
-            const sqlQuery = 'INSERT INTO locations (search_query, formatted_query, longitude, latitude) VALUES ($1, $2, $3, $4);'
-            const valueArray = [newLocation.search_query, newLocation.formatted_query, newLocation.longitude, newLocation.latitude];
-            client.query(sqlQuery, valueArray);
-            res.send(newLocation);
-          })
-          .catch(error => {
-            res.send(error).status(500);
-          });
-        }
-      })
+  client.query(sqlQuery, sqlValues).then((resultFromSql) => {
+    if (resultFromSql.rowCount !== 0) {
+      res.send(resultFromSql.rows[0]);
+    } else {
+      superagent
+        .get(url)
+        .query(queryParameters)
+        .then((resultFromSuper) => {
+          // send data
+          let newLocation = new Location(city, resultFromSuper.body[0]);
+          // store data in db
+          const sqlQuery =
+            'INSERT INTO locations (search_query, formatted_query, longitude, latitude) VALUES ($1, $2, $3, $4);';
+          const valueArray = [
+            newLocation.search_query,
+            newLocation.formatted_query,
+            newLocation.longitude,
+            newLocation.latitude,
+          ];
+          client.query(sqlQuery, valueArray);
+          res.send(newLocation);
+        })
+        .catch((error) => {
+          res.send(error).status(500);
+        });
     }
+  });
+}
 
-    
 function getWeather(req, res) {
   const queryForSuper = {
     lat: req.query.latitude,
-    lon: req.query.longitude
+    lon: req.query.longitude,
   };
 
   const url = 'https://api.weatherbit.io/v2.0/forecast/daily';
@@ -78,12 +86,13 @@ function getWeather(req, res) {
     key: process.env.WEATHER_API_KEY,
     lat: req.query.latitude,
     lon: req.query.longitude,
-    days: 7
+    days: 7,
   };
 
-  superagent.get(url)
+  superagent
+    .get(url)
     .query(queryParameters)
-    .then(resultFromSuper => {
+    .then((resultFromSuper) => {
       const dataFromJSON = resultFromSuper.body;
       const weatherDataArray = dataFromJSON.data.map((value) => {
         const forecast = value.weather.description;
@@ -91,10 +100,10 @@ function getWeather(req, res) {
         const time = date.toDateString();
         const location = new Weather(forecast, time);
         return location;
-      })
+      });
       res.send(weatherDataArray);
     })
-    .catch(error => {
+    .catch((error) => {
       res.send(error).status(500);
     });
 }
@@ -105,26 +114,52 @@ function getTrails(req, res) {
   const queryParameters = {
     key: process.env.TRAILS_API_KEY,
     lat: req.query.latitude,
-    lon: req.query.longitude
-  }
+    lon: req.query.longitude,
+  };
 
-  superagent.get(url)
-  .query(queryParameters)
-  .then(resultFromSuper => {
-    const dataFromJSON = resultFromSuper.body;
-    const trailsDataArray = dataFromJSON.trails.map((value) => {
-      const trail = new Trail(value);
-      return trail;
+  superagent
+    .get(url)
+    .query(queryParameters)
+    .then((resultFromSuper) => {
+      const dataFromJSON = resultFromSuper.body;
+      const trailsDataArray = dataFromJSON.trails.map((value) => {
+        const trail = new Trail(value);
+        return trail;
+      });
+      res.send(trailsDataArray);
     })
-    res.send(trailsDataArray);
-  })
-  .catch(error => {
-    res.send(error).status(500);
-  });
+    .catch((error) => {
+      res.send(error).status(500);
+    });
+}
+
+function getMovies(req, res) {
+  const url = 'https://api.themoviedb.org/3/search/movie/';
+
+  const queryParameters = {
+    query: req.query.search_query,
+    api_key: process.env.MOVIE_API_KEY,
+  };
+
+  superagent
+    .get(url)
+    .query(queryParameters)
+    .then((resultFromSuper) => {
+      const dataFromJSON = resultFromSuper.body.results;
+      const movieDataArray = dataFromJSON.map((value) => {
+        const movie = new Movie(value);
+        console.log(movie);
+        return movie;
+      });
+      res.send(movieDataArray);
+    })
+    .catch((error) => {
+      res.send(error).status(500);
+    });
 }
 
 function sendError(req, res) {
-  res.status(500).send('This page does not exist');
+  res.status(500).send('This page does not exist Potato');
 }
 
 function Location(city, obj) {
@@ -152,6 +187,16 @@ function Trail(obj) {
   this.condition_time = obj.conditionDate.split(' ')[1];
 }
 
+function Movie(obj) {
+  this.title = obj.title;
+  this.overview = obj.overview;
+  this.average_votes = obj.vote_average;
+  this.total_votes = obj.vote_count;
+  this.image_url = 'https://image.tmdb.org/t/p/w500' + obj.poster_path;
+  this.popularity = obj.popularity;
+  this.released_on = obj.release_date;
+}
+
 app.listen(PORT, () => {
-  console.log(PORT)
+  console.log(PORT);
 });
