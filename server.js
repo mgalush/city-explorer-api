@@ -5,6 +5,7 @@ require('dotenv').config();
 const express = require('express');
 const superagent = require('superagent');
 const cors = require('cors');
+const pg = require('pg');
 
 // global variables
 const PORT = process.env.PORT || 3000;
@@ -12,6 +13,9 @@ const app = express();
 
 //configs
 app.use(cors()); 
+const client = new pg.Client(process.env.DATABASE_URL);
+client.on('error', console.error);
+client.connect();
 
 app.get('/location', getLocation);
 app.get('/weather', getWeather);
@@ -31,21 +35,37 @@ function getLocation(req, res) {
     format: 'json'
   };
 
-  superagent.get(url)
-    .query(queryParameters)
-    .then(resultFromSuper => {
-      const longitude = resultFromSuper.body[0].lon;
-      const latitude = resultFromSuper.body[0].lat;
-      const displayName = resultFromSuper.body[0].display_name;
-      let location = new Location(displayName, city, longitude, latitude);
-      res.send(location);
-    })
-    .catch(error => {
-      console.log(error);
-      res.send(error).status(500);
-    });
-}
+  // if location is in db, get data from db 
+  // else, send data
+  const sqlQuery = 'SELECT * FROM locations WHERE search_query=$1';
+  const sqlValues = [city];
+  client.query(sqlQuery, sqlValues)
+    .then(resultFromSql => {
+      if(resultFromSql.rowCount !== 0) {
+        res.send(resultFromSql.rows[0])
+      } else {
+        superagent.get(url)
+          .query(queryParameters)
+          .then(resultFromSuper => {
+            // send data
+            let newLocation = new Location(city, resultFromSuper.body[0]);
+            
+            // store data in db
+            const sqlQuery = 'INSERT INTO locations (search_query, formatted_query, longitude, latitude) VALUES ($1, $2, $3, $4);'
+            const valueArray = [newLocation.search_query, newLocation.formatted_query, newLocation.longitude, newLocation.latitude];
+            client.query(sqlQuery, valueArray);
 
+            res.send(newLocation);
+          })
+          .catch(error => {
+            res.send(error).status(500);
+          });
+        }
+      })
+      
+    }
+
+    
 function getWeather(req, res) {
   const queryForSuper = {
     lat: req.query.latitude,
@@ -57,7 +77,8 @@ function getWeather(req, res) {
   const queryParameters = {
     key: process.env.WEATHER_API_KEY,
     lat: req.query.latitude,
-    lon: req.query.longitude
+    lon: req.query.longitude,
+    days: 7
   };
 
   superagent.get(url)
@@ -74,7 +95,6 @@ function getWeather(req, res) {
       res.send(weatherDataArray);
     })
     .catch(error => {
-      console.log(error);
       res.send(error).status(500);
     });
 
@@ -112,7 +132,6 @@ function getTrails(req, res) {
     res.send(trailsDataArray);
   })
   .catch(error => {
-    console.log(error);
     res.send(error).status(500);
   });
 }
@@ -121,11 +140,11 @@ function sendError(req, res) {
   res.status(500).send('This page does not exist');
 }
 
-function Location(displayName, city, longitude, latitude) {
+function Location(city, obj) {
   this.search_query = city;
-  this.formatted_query = displayName;
-  this.longitude = longitude;
-  this.latitude = latitude;
+  this.formatted_query = obj.display_name;
+  this.longitude = obj.lon;
+  this.latitude = obj.lat;
 }
 
 function Weather(forecast, time) {
