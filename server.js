@@ -26,6 +26,7 @@ app.get('/location', getLocation);
 app.get('/weather', getWeather);
 app.get('/trails', getTrails);
 app.get('/movies', getMovies);
+app.get('/yelp', getRestaurants);
 app.get('*', sendError);
 
 function getLocation(req, res) {
@@ -148,10 +149,34 @@ function getMovies(req, res) {
       const dataFromJSON = resultFromSuper.body.results;
       const movieDataArray = dataFromJSON.map((value) => {
         const movie = new Movie(value);
-        console.log(movie);
         return movie;
       });
       res.send(movieDataArray);
+    })
+    .catch((error) => {
+      res.send(error).status(500);
+    });
+}
+
+function getRestaurants(req, res) {
+  const url = 'https://api.yelp.com/v3/businesses/search';
+
+  const queryParameters = {
+    location: req.query.search_query,
+    key: process.env.YELP_API_KEY,
+  };
+
+  superagent
+    .get(url)
+    .set('Authorization', `Bearer ${process.env.YELP_API_KEY}`)
+    .query(queryParameters)
+    .then((resultFromSuper) => {
+      const dataFromJSON = resultFromSuper.body.businesses;
+      const restaurantsDataArray = dataFromJSON.map((value) => {
+        const restaurant = new Restaurant(value);
+        return restaurant;
+      });
+      res.send(restaurantsDataArray);
     })
     .catch((error) => {
       res.send(error).status(500);
@@ -195,6 +220,14 @@ function Movie(obj) {
   this.image_url = 'https://image.tmdb.org/t/p/w500' + obj.poster_path;
   this.popularity = obj.popularity;
   this.released_on = obj.release_date;
+}
+
+function Restaurant(obj) {
+  this.name = obj.name;
+  this.image_url = obj.image_url;
+  this.price = obj.price;
+  this.rating = obj.rating;
+  this.url = obj.url;
 }
 
 app.listen(PORT, () => {
